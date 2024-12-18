@@ -1,0 +1,126 @@
+Guía para poner en marcha el proyecto web con Docker
+Este proyecto utiliza Docker para ejecutar una aplicación web dinámica que se conecta a una base de datos MySQL. A continuación, te explico cómo configurar y poner en marcha el entorno utilizando docker-compose.
+
+Requisitos previos
+Antes de comenzar, asegúrate de tener instalados los siguientes programas en tu sistema:
+
+Docker
+Docker Compose
+Pasos para poner en marcha el proyecto
+Clonar el repositorio
+Si aún no tienes el proyecto, clónalo desde el repositorio:
+
+bash
+git clone <URL_DEL_REPOSITORIO>
+cd <NOMBRE_DEL_DIRECTORIO>
+Configurar las variables de entorno
+Asegúrate de que las variables de entorno del archivo docker-compose.yml estén configuradas correctamente. Necesitarás proporcionar la información de la base de datos en las siguientes líneas:
+
+yaml
+Copia el codi
+environment:
+  - DB_SERVER=db.fmesasc.com  # Servidor de la base de datos
+  - DB_USERNAME=daw2          # Usuario de la base de datos
+  - DB_PASSWORD=Gimbernat1     # Contraseña de la base de datos
+  - DB_NAME=daw2              # Nombre de la base de datos
+Ajusta los valores según la configuración de tu base de datos.
+
+Construir y ejecutar los contenedores
+En la raíz del proyecto, ejecuta el siguiente comando para construir y levantar los contenedores de Docker:
+
+bash
+Copia el codi
+docker-compose up --build
+Acceder a la página web
+Una vez que los contenedores se hayan iniciado, podrás acceder a la página web en tu navegador visitando http://localhost:8080.
+
+Estructura del proyecto
+docker-compose.yml
+Este archivo define el entorno de Docker para tu proyecto. A continuación se explica cada sección:
+
+yaml
+Copia el codi
+version: "3.8"
+
+services:
+  web:
+    build: .  # Indica que se construya la imagen desde el Dockerfile en el directorio actual
+    container_name: proyecto_web_dinamica
+    ports:
+      - "8080:80"  # El puerto 8080 del host se conecta al puerto 80 del contenedor
+    volumes:
+      - ./:/var/www/html  # Monta tu proyecto en la carpeta web de Apache
+    networks:
+      - proyecto-net
+    environment:
+      - DB_SERVER=db.fmesasc.com  # Servidor de la base de datos
+      - DB_USERNAME=daw2          # Usuario de la base de datos
+      - DB_PASSWORD=Gimbernat1     # Contraseña de la base de datos
+      - DB_NAME=daw2              # Nombre de la base de datos
+    restart: always  # Reinicia el contenedor automáticamente si se detiene
+
+networks:
+  proyecto-net:
+    driver: bridge  # Utiliza el controlador de red por defecto (bridge)
+Explicación de las secciones:
+
+services: Define los contenedores que componen el entorno. En este caso, solo tienes uno llamado web.
+build: Define que Docker debe construir la imagen a partir del Dockerfile en el directorio actual (.).
+container_name: Le da un nombre al contenedor para facilitar su identificación.
+ports: Mapea el puerto 8080 del host (tu máquina) al puerto 80 del contenedor, que es donde Apache servirá la aplicación.
+volumes: Mapea el directorio local al contenedor, asegurando que cualquier cambio en tu código sea reflejado en tiempo real dentro del contenedor.
+environment: Define las variables de entorno que se utilizarán dentro del contenedor, como los parámetros de conexión a la base de datos.
+restart: Configura el contenedor para que se reinicie automáticamente si se detiene.
+Dockerfile
+El Dockerfile describe cómo debe construirse la imagen de Docker para el contenedor web. Aquí está el contenido:
+
+Dockerfile
+Copia el codi
+# Usa la imagen oficial de PHP 8.1 con Apache
+FROM php:8.1-apache
+
+# Instalar las dependencias necesarias para PDO y MySQL
+RUN docker-php-ext-install pdo_mysql
+
+# Habilitar mod_rewrite para Apache (si lo necesitas)
+RUN a2enmod rewrite
+
+# Exponer el puerto 80
+EXPOSE 80
+Explicación de las líneas:
+
+FROM php:8.1-apache: Utiliza una imagen base de PHP 8.1 con Apache preinstalado.
+RUN docker-php-ext-install pdo_mysql: Instala la extensión pdo_mysql, que permite que PHP se conecte a una base de datos MySQL.
+RUN a2enmod rewrite: Habilita el módulo de reescritura de URL de Apache, necesario si utilizas URLs amigables.
+EXPOSE 80: Expone el puerto 80 del contenedor, que es donde Apache servirá la página web.
+db.php
+Este archivo PHP contiene el código para conectarse a la base de datos utilizando PDO. La información de conexión se obtiene de las variables de entorno que definiste en el docker-compose.yml.
+
+php
+<?php
+// Obtener los datos de conexión desde las variables de entorno
+$servername = getenv('DB_SERVER');  // Obtiene el servidor de la base de datos desde el entorno
+$username = getenv('DB_USERNAME');  // Obtiene el nombre de usuario desde el entorno
+$password = getenv('DB_PASSWORD');  // Obtiene la contraseña desde el entorno
+$dbname = getenv('DB_NAME');        // Obtiene el nombre de la base de datos desde el entorno
+
+try {
+    // Crear la conexión con PDO
+    $conn = new PDO("mysql:host=$servername;dbname=$dbname", $username, $password);
+    
+    // Establecer el modo de error de PDO a excepción
+    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    
+} catch(PDOException $e) {
+    // En caso de error en la conexión
+    die("Conexión fallida: " . $e->getMessage());
+}
+
+// Cerrar la conexión
+?>
+Explicación del código:
+
+getenv: Obtiene los valores de las variables de entorno definidas en docker-compose.yml.
+new PDO(...): Crea una nueva conexión PDO a la base de datos.
+setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION): Configura PDO para que lance excepciones si ocurre un error.
+catch(PDOException $e): Captura cualquier error de conexión y muestra un mensaje.
